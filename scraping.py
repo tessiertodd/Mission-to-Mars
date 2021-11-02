@@ -2,6 +2,7 @@
 from splinter import Browser
 from bs4 import BeautifulSoup as soup
 import pandas as pd
+import requests
 import datetime as dt
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -13,13 +14,15 @@ def scrape_all():
     browser = Browser('chrome', **executable_path, headless=True)
 
     news_title, news_paragraph = mars_news(browser)
-
-    # Run all scraping functions and store retults in dictionary
+    hemisphere_image_urls = mars_hemispheres(browser)
+  
+    # Run all scraping functions and store retults in dictionary (not sure if nested dictionary is right)
     data = {
         "news_title": news_title,
         "news_paragraph": news_paragraph,
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
+        "hemisphere_image_title": hemisphere_image_urls,
         "last_modified": dt.datetime.now()
     }
 
@@ -97,13 +100,49 @@ def mars_facts():
         return None
     
     # Assign columns and set index of dataframe
-    df.columns=['description', 'Mars', 'Earth']
-    df.set_index('description', inplace=True)
+    df.columns=['Description', 'Mars', 'Earth']
+    df.set_index('Description', inplace=True)
     
     # Convert DataFrame to HTML format, add boostrap
     return df.to_html()
 
-if __name__ == "__main__":
 
+def mars_hemispheres(browser):
+
+    # ## Scrape High-Resolution Mars' Hemisphere Images and Titles
+
+    # 1. Use browser to visit the URL 
+    url = 'https://marshemispheres.com/'
+    response=requests.get(url)
+
+    # 2. Create a list to hold the images and titles.
+    hemisphere_image_urls = []
+
+    # 3. Write code to retrieve the image urls and titles for each hemisphere.
+    img_soup = soup(response.text, 'html.parser')
+    
+    # results returned as an interable list
+    img_link=img_soup.find_all('div', class_="item")
+
+    # Create for loop to iterate through list
+    for img in img_link:
+        ref=img.find('a', class_="result-title")
+        hem_link=img.a['href']
+        img_url = f'https://marshemispheres.com/{hem_link}'
+        browser.visit(img_url)
+        html = browser.html
+        img_soup2 = soup(html, 'html.parser')
+        hem_title = img_soup2.find("h2", class_="title").get_text()
+        hem_full_img = img_soup2.find("img", class_="wide-image").get("src")
+        hem_img_url = f'https://marshemispheres.com/{hem_full_img}'
+        hemispheres={"img_url":hem_img_url, "title":hem_title}
+        hemisphere_image_urls.append(hemispheres)
+        browser.back()
+
+    # Return dictionary of images and titles of Mars hemispheres
+    return hemisphere_image_urls
+
+if __name__ == "__main__":
+    
     # If running as script, print scraped data
     print(scrape_all())
